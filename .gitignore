@@ -1,0 +1,29 @@
+# Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.swp
+
+# Virtual Environment
+venv/
+.env
+*.env
+
+# Logs
+*.log
+
+# IDE/Editor
+.vscode/
+.idea/
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
+
+# Uploaded Files
+/uploads/
+
+# Firebase Keys or Sensitive Configs
+service-account.json
+capstone-bangkit-d0ca4-7ff113bb4e31.json
