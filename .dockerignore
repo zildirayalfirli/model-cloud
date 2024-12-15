@@ -1,0 +1,43 @@
+# Byte-compiled and optimized Python files
+*.pyc
+*.pyo
+__pycache__
+
+# Virtual environment
+venv/
+env/
+
+# Ignore environment variables and credentials
+.env
+
+# Ignore all JSON files except the required ones
+*.json
+!service-account.json
+!capstone-bangkit-d0ca4-7ff113bb4e31.json
+
+# Python cache and logs
+*.log
+
+# Ignore IDE and editor configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node-related (if not needed)
+node_modules/
+
+# Ignore uploads or runtime files
+uploads/
+
+# Ignore Docker-specific files
+Dockerfile
+docker-compose.yml
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
+
+# Ignore test-related files
+tests/
+*.test.py

@@ -4,6 +4,7 @@ import tensorflow as tf
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 from google.cloud import firestore
+from google.oauth2 import service_account
 from Object_Detection.utils.object_localization import ocr_receipt
 from recommender.full_deployment import full_deployment
 import re
@@ -14,25 +15,27 @@ dotenv.load_dotenv()
 
 app = Flask(__name__)
 
-MODEL_PATH = "/Users/tasyanadhila/Downloads/OCR_API/Object_Detection/Saved_Models/model.keras"
+MODEL_PATH = "./Object_Detection/Saved_Models/model.keras"
 UPLOAD_FOLDER = './uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png'}
-
-db = firestore.Client()
-COLLECTION_NAME = "ocr_receipts"
 JWT_SECRET = os.getenv("JWT_SECRET", "capstone_bangkit")
 JWT_ALGORITHM = "HS256"
 
-# Load TensorFlow model
+SERVICE_ACCOUNT_PATH = os.getenv("SERVICE_ACCOUNT_PATH", "./service-account.json")
+
+# Initialize Firestore client with credentials
+credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_PATH)
+db = firestore.Client(credentials=credentials)
+COLLECTION_NAME = "ocr_receipts"
+
 if not os.path.exists(MODEL_PATH):
     raise FileNotFoundError(f"Model file not found at {MODEL_PATH}")
 
 model = tf.keras.models.load_model(MODEL_PATH)
 print("Model loaded successfully.")
 
-# Utility functions
 def allowed_file(filename):
     """
     Validate if the uploaded file has an allowed extension.
@@ -50,9 +53,8 @@ def authenticate_request(func):
         if not token:
             return jsonify({"error": "No token provided"}), 403
         try:
-            # Decode JWT token
             decoded = pyjwt.decode(token.split(" ")[1], JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            request.uid = decoded.get("userId")  # Extract UID from token
+            request.uid = decoded.get("userId")
             return func(*args, **kwargs)
         except pyjwt.ExpiredSignatureError:
             return jsonify({"error": "Token expired. Please log in again."}), 401
@@ -90,7 +92,6 @@ def extract_total_amount(extracted_text):
     return "Total amount not found"
 
 
-# API Endpoints
 @app.route('/ocr', methods=['POST'])
 @authenticate_request
 def ocr_receipt_api():
@@ -120,7 +121,7 @@ def ocr_receipt_api():
                 "filename": filename,
                 "extracted_text": labeled_lines,
                 "total_amount": total_amount,
-                "uid": request.uid,  # Store user UID
+                "uid": request.uid,
             }
 
             db.collection(COLLECTION_NAME).add(record)
@@ -148,7 +149,6 @@ def full_deployment_api():
     if 'file' not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
-    # Extract file
     file = request.files['file']
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
@@ -157,7 +157,6 @@ def full_deployment_api():
         print(f"File uploaded: {file_path}")
 
         try:
-            # Fetch email from Firestore using UID
             user_ref = db.collection("users").document(request.uid)
             user_doc = user_ref.get()
 
@@ -167,11 +166,9 @@ def full_deployment_api():
             user_data = user_doc.to_dict()
             email = user_data.get("email")
 
-            # Extract lon and lat from form data
-            lon = request.form.get("lon", 106.8272)  # Default to Jakarta's longitude
-            lat = request.form.get("lat", -6.1751)   # Default to Jakarta's latitude
+            lon = request.form.get("lon", 106.8272)
+            lat = request.form.get("lat", -6.1751)
 
-            # Validate lon and lat
             try:
                 lon = float(lon)
                 lat = float(lat)
@@ -180,11 +177,9 @@ def full_deployment_api():
             except ValueError:
                 return jsonify({"error": "Longitude and latitude must be numeric."}), 400
 
-            # Define other parameters
-            key_path = os.getenv("GOOGLE_KEY_PATH", "/Users/tasyanadhila/Downloads/OCR_API/capstone-bangkit-d0ca4-7ff113bb4e31.json")
-            dataset_path = os.getenv("DATASET_PATH", "/Users/tasyanadhila/Downloads/OCR_API/recommender/dataset/purchase_history.csv")
+            key_path = os.getenv("GOOGLE_KEY_PATH", "./capstone-bangkit-d0ca4-7ff113bb4e31.json")
+            dataset_path = os.getenv("DATASET_PATH", "./recommender/dataset/purchase_history.csv")
 
-            # Perform full deployment
             recommendations = full_deployment(
                 key_path=key_path,
                 test_path=file_path,
